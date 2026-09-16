@@ -19,6 +19,7 @@ use niri_config::{
     Config, FloatOrInt, Key, Modifiers, OutputName, TrackLayout, WarpMouseToFocusMode,
     WorkspaceReference, Xkb,
 };
+use niri_ipc::Event;
 use smithay::backend::allocator::Fourcc;
 use smithay::backend::input::{InputTime, Keycode};
 use smithay::backend::renderer::damage::OutputDamageTracker;
@@ -3899,6 +3900,13 @@ impl Niri {
         }
 
         self.queue_redraw_all();
+
+        if let Some(server) = &self.ipc_server {
+            server.send_event(Event::SubmapActivated {
+                name: name.to_string(),
+            });
+        }
+
         true
     }
 
@@ -4007,6 +4015,10 @@ impl Niri {
         }
 
         self.queue_redraw_all();
+
+        if let Some(server) = &self.ipc_server {
+            server.send_event(Event::SubmapDeactivated);
+        }
     }
 
     fn start_submap_timeout(&mut self, timeout_ms: u64) {
