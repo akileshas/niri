@@ -715,7 +715,7 @@ impl State {
                 .niri
                 .active_submap
                 .as_ref()
-                .map_or(false, |s| s.auto_reset)
+                .is_some_and(|s| s.auto_reset)
             {
                 self.niri.exit_submap();
             }
@@ -756,7 +756,7 @@ impl State {
                     .niri
                     .active_submap
                     .as_ref()
-                    .map_or(false, |s| s.auto_reset)
+                    .is_some_and(|s| s.auto_reset)
                 {
                     self.niri.exit_submap();
                 }
@@ -2506,7 +2506,7 @@ impl State {
                 self.niri.exit_submap();
             }
             Action::ToggleSubmap(name) => {
-                if self.niri.active_submap.as_ref().map_or(false, |s| s.name == name) {
+                if self.niri.active_submap.as_ref().is_some_and(|s| s.name == name) {
                     self.niri.exit_submap();
                 } else {
                     self.niri.enter_submap(&name);

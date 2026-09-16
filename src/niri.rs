@@ -176,6 +176,7 @@ use crate::render_helpers::{
 #[cfg(feature = "xdp-gnome-screencast")]
 use crate::screencasting::Screencasting;
 use crate::ui::config_error_notification::ConfigErrorNotification;
+use crate::ui::submap_overlay::SubmapOverlay;
 use crate::ui::exit_confirm_dialog::{ExitConfirmDialog, ExitConfirmDialogRenderElement};
 use crate::ui::hotkey_overlay::HotkeyOverlay;
 use crate::ui::mru::{MruCloseRequest, WindowMruUi, WindowMruUiRenderElement};
@@ -421,6 +422,7 @@ pub struct Niri {
 
     pub screenshot_ui: ScreenshotUi,
     pub config_error_notification: ConfigErrorNotification,
+    pub submap_overlay: SubmapOverlay,
     pub hotkey_overlay: HotkeyOverlay,
     pub exit_confirm_dialog: ExitConfirmDialog,
 
@@ -1596,6 +1598,13 @@ impl State {
             self.niri.layout.ensure_named_workspace(ws_config);
         }
 
+        // Exit active submap if it was removed from config.
+        if let Some(ref active) = self.niri.active_submap {
+            if !config.submaps.contains_key(&active.name) {
+                self.niri.exit_submap();
+            }
+        }
+
         let rate = 1.0 / config.animations.slowdown.max(0.001);
         self.niri.clock.set_rate(rate);
         self.niri
@@ -2568,6 +2577,8 @@ impl Niri {
         let config_error_notification =
             ConfigErrorNotification::new(animation_clock.clone(), config.clone());
 
+        let submap_overlay = SubmapOverlay::new(animation_clock.clone());
+
         let mut hotkey_overlay = HotkeyOverlay::new(config.clone(), mod_key);
         if !config_.hotkey_overlay.skip_at_startup {
             hotkey_overlay.show();
@@ -2764,6 +2775,7 @@ impl Niri {
 
             screenshot_ui,
             config_error_notification,
+            submap_overlay,
             hotkey_overlay,
             exit_confirm_dialog,
 
@@ -3868,6 +3880,8 @@ impl Niri {
             previous_submap: previous,
         });
 
+        self.submap_overlay.show(name);
+
         if let Some(timeout_ms) = timeout_ms {
             self.start_submap_timeout(timeout_ms);
         }
@@ -3924,6 +3938,8 @@ impl Niri {
         let active_name = active.name.clone();
 
         debug!("exited submap \"{}\"", active_name);
+
+        self.submap_overlay.hide();
 
         self.cancel_submap_timeout();
 
@@ -4433,6 +4449,7 @@ impl Niri {
 
         self.layout.advance_animations();
         self.config_error_notification.advance_animations();
+        self.submap_overlay.advance_animations();
         self.exit_confirm_dialog.advance_animations();
         self.screenshot_ui.advance_animations();
         self.window_mru_ui.advance_animations();
@@ -4605,6 +4622,11 @@ impl Niri {
 
         // Next, the config error notification too.
         if let Some(element) = self.config_error_notification.render(ctx.renderer, output) {
+            push(element.into());
+        }
+
+        // Next, the submap overlay.
+        if let Some(element) = self.submap_overlay.render(ctx.renderer, output) {
             push(element.into());
         }
 
@@ -4977,6 +4999,7 @@ impl Niri {
             state.unfinished_animations_remain = self.layout.are_animations_ongoing(Some(output));
             state.unfinished_animations_remain |=
                 self.config_error_notification.are_animations_ongoing();
+            state.unfinished_animations_remain |= self.submap_overlay.are_animations_ongoing();
             state.unfinished_animations_remain |= self.exit_confirm_dialog.are_animations_ongoing();
             state.unfinished_animations_remain |= self.screenshot_ui.are_animations_ongoing();
             state.unfinished_animations_remain |= self.window_mru_ui.are_animations_ongoing();
