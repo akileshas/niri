@@ -200,6 +200,16 @@ const CLEAR_COLOR_LOCKED: [f32; 4] = [0.3, 0.1, 0.1, 1.];
 // should be ~1.995 seconds.
 const FRAME_CALLBACK_THROTTLE: Option<Duration> = Some(Duration::from_millis(995));
 
+pub struct ActiveSubmap {
+    pub name: String,
+    pub auto_reset: bool,
+    pub clear_global_binds: bool,
+    pub catch_all: niri_config::CatchAllMode,
+    pub input_policy: niri_config::SubmapInputPolicy,
+    pub reset_target: String,
+    pub previous_submap: Option<String>,
+}
+
 pub struct Niri {
     pub config: Rc<RefCell<Config>>,
 
@@ -346,6 +356,9 @@ pub struct Niri {
     /// Button codes of the mouse buttons to suppress.
     pub suppressed_buttons: HashSet<u32>,
     pub bind_cooldown_timers: HashMap<Key, RegistrationToken>,
+    pub active_submap: Option<ActiveSubmap>,
+    pub submap_timeout_token: Option<RegistrationToken>,
+    pub submap_hook_depth: u32,
     pub bind_repeat_timer: Option<RegistrationToken>,
     pub keyboard_focus: KeyboardFocus,
     pub layer_shell_on_demand_focus: Option<LayerSurface>,
@@ -2701,6 +2714,9 @@ impl Niri {
             suppressed_keys: HashSet::new(),
             suppressed_buttons: HashSet::new(),
             bind_cooldown_timers: HashMap::new(),
+            active_submap: None,
+            submap_timeout_token: None,
+            submap_hook_depth: 0,
             bind_repeat_timer: Option::default(),
             presentation_state,
             security_context_state,
@@ -3809,6 +3825,150 @@ impl Niri {
     pub fn queue_redraw_all(&mut self) {
         for state in self.output_state.values_mut() {
             state.redraw_state = mem::take(&mut state.redraw_state).queue_redraw();
+        }
+    }
+
+    pub fn enter_submap(&mut self, name: &str) -> bool {
+        if self.submap_hook_depth > 0 {
+            warn!("switch-submap ignored inside on-enter/on-exit hook");
+            return false;
+        }
+
+        let (submap_data, timeout_ms) = {
+            let config = self.config.borrow();
+            let Some(submap) = config.submaps.get(name) else {
+                warn!("submap \"{name}\" not found");
+                return false;
+            };
+            (
+                (
+                    submap.auto_reset,
+                    submap.clear_global_binds,
+                    submap.catch_all,
+                    submap.input_policy.clone(),
+                    submap.reset_target.clone(),
+                ),
+                submap.timeout_ms,
+            )
+        };
+
+        debug!("entered submap \"{name}\"");
+
+        let previous = self.active_submap.as_ref().map(|s| s.name.clone());
+        let (auto_reset, clear_global_binds, catch_all, input_policy, reset_target) = submap_data;
+
+        self.active_submap = Some(ActiveSubmap {
+            name: name.to_string(),
+            auto_reset,
+            clear_global_binds,
+            catch_all,
+            input_policy,
+            reset_target,
+            previous_submap: previous,
+        });
+
+        if let Some(timeout_ms) = timeout_ms {
+            self.start_submap_timeout(timeout_ms);
+        }
+
+        self.queue_redraw_all();
+        true
+    }
+
+    pub fn exit_submap(&mut self) {
+        if self.submap_hook_depth > 0 {
+            warn!("reset-submap ignored inside on-enter/on-exit hook");
+            return;
+        }
+
+        let active = match self.active_submap.take() {
+            Some(a) => a,
+            None => return,
+        };
+
+        debug!("exited submap \"{}\"", active.name);
+
+        self.cancel_submap_timeout();
+
+        match active.reset_target.as_str() {
+            "default" => {}
+            "previous" => {
+                if let Some(prev_name) = active.previous_submap {
+                    let submap_data = {
+                        let config = self.config.borrow();
+                        config.submaps.get(&prev_name).map(|prev| {
+                            (
+                                prev.auto_reset,
+                                prev.clear_global_binds,
+                                prev.catch_all,
+                                prev.input_policy.clone(),
+                                prev.reset_target.clone(),
+                            )
+                        })
+                    };
+                    if let Some((auto_reset, clear_global_binds, catch_all, input_policy, reset_target)) = submap_data {
+                        debug!("restoring previous submap \"{}\"", prev_name);
+                        self.active_submap = Some(ActiveSubmap {
+                            name: prev_name,
+                            auto_reset,
+                            clear_global_binds,
+                            catch_all,
+                            input_policy,
+                            reset_target,
+                            previous_submap: None,
+                        });
+                    }
+                }
+            }
+            target => {
+                let submap_data = {
+                    let config = self.config.borrow();
+                    config.submaps.get(target).map(|sub| {
+                        (
+                            sub.auto_reset,
+                            sub.clear_global_binds,
+                            sub.catch_all,
+                            sub.input_policy.clone(),
+                            sub.reset_target.clone(),
+                        )
+                    })
+                };
+                if let Some((auto_reset, clear_global_binds, catch_all, input_policy, reset_target)) = submap_data {
+                    self.active_submap = Some(ActiveSubmap {
+                        name: target.to_string(),
+                        auto_reset,
+                        clear_global_binds,
+                        catch_all,
+                        input_policy,
+                        reset_target,
+                        previous_submap: Some(active.name),
+                    });
+                } else {
+                    warn!("reset-target \"{target}\" not found, falling back to root");
+                }
+            }
+        }
+
+        self.queue_redraw_all();
+    }
+
+    fn start_submap_timeout(&mut self, timeout_ms: u64) {
+        self.cancel_submap_timeout();
+        let timer = Timer::from_duration(Duration::from_millis(timeout_ms));
+        let token = self
+            .event_loop
+            .insert_source(timer, |_, _, state| {
+                debug!("submap timeout fired");
+                state.niri.exit_submap();
+                TimeoutAction::Drop
+            })
+            .unwrap();
+        self.submap_timeout_token = Some(token);
+    }
+
+    fn cancel_submap_timeout(&mut self) {
+        if let Some(token) = self.submap_timeout_token.take() {
+            self.event_loop.remove(token);
         }
     }
 
