@@ -3871,6 +3871,33 @@ impl Niri {
             self.start_submap_timeout(timeout_ms);
         }
 
+        let on_enter = {
+            let config = self.config.borrow();
+            config
+                .submaps
+                .get(name)
+                .map(|s| s.on_enter.clone())
+                .unwrap_or_default()
+        };
+        if !on_enter.is_empty() {
+            let name_clone = name.to_string();
+            self.event_loop.insert_idle(move |state| {
+                state.niri.submap_hook_depth += 1;
+                let actions = {
+                    let config = state.niri.config.borrow();
+                    config
+                        .submaps
+                        .get(&name_clone)
+                        .map(|s| s.on_enter.clone())
+                        .unwrap_or_default()
+                };
+                for action in actions {
+                    state.do_action(action, false);
+                }
+                state.niri.submap_hook_depth -= 1;
+            });
+        }
+
         self.queue_redraw_all();
         true
     }
@@ -3886,9 +3913,20 @@ impl Niri {
             None => return,
         };
 
-        debug!("exited submap \"{}\"", active.name);
+        let active_name = active.name.clone();
+
+        debug!("exited submap \"{}\"", active_name);
 
         self.cancel_submap_timeout();
+
+        let on_exit = {
+            let config = self.config.borrow();
+            config
+                .submaps
+                .get(&active_name)
+                .map(|s| s.on_exit.clone())
+                .unwrap_or_default()
+        };
 
         match active.reset_target.as_str() {
             "default" => {}
@@ -3941,12 +3979,31 @@ impl Niri {
                         catch_all,
                         input_policy,
                         reset_target,
-                        previous_submap: Some(active.name),
+                        previous_submap: Some(active_name.clone()),
                     });
                 } else {
                     warn!("reset-target \"{target}\" not found, falling back to root");
                 }
             }
+        }
+
+        if !on_exit.is_empty() {
+            let old_name = active_name;
+            self.event_loop.insert_idle(move |state| {
+                state.niri.submap_hook_depth += 1;
+                let actions = {
+                    let config = state.niri.config.borrow();
+                    config
+                        .submaps
+                        .get(&old_name)
+                        .map(|s| s.on_exit.clone())
+                        .unwrap_or_default()
+                };
+                for action in actions {
+                    state.do_action(action, false);
+                }
+                state.niri.submap_hook_depth -= 1;
+            });
         }
 
         self.queue_redraw_all();

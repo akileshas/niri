@@ -556,8 +556,24 @@ impl State {
 
                 let res = {
                     let config = this.niri.config.borrow();
-                    let bindings =
-                        make_binds_iter(&config, &mut this.niri.window_mru_ui, modifiers);
+                    let _submap_active = this.niri.active_submap.is_some();
+
+                    let bindings: Vec<&Bind> = if let Some(ref submap) = this.niri.active_submap {
+                        let mut binds: Vec<&Bind> = config
+                            .submaps
+                            .get(&submap.name)
+                            .map(|s| s.binds.iter().collect())
+                            .unwrap_or_default();
+                        if submap.clear_global_binds {
+                            binds.extend(config.binds.0.iter().filter(|b| b.universal));
+                        } else {
+                            binds.extend(config.binds.0.iter());
+                        }
+                        binds
+                    } else {
+                        make_binds_iter(&config, &mut this.niri.window_mru_ui, modifiers)
+                            .collect()
+                    };
 
                     should_intercept_key(
                         &mut this.niri.suppressed_keys,
@@ -573,6 +589,29 @@ impl State {
                         is_inhibiting_shortcuts,
                     )
                 };
+
+                if matches!(res, FilterResult::Forward)
+                    && this.niri.active_submap.is_some()
+                    && pressed
+                {
+                    let catch_all = this
+                        .niri
+                        .active_submap
+                        .as_ref()
+                        .map(|s| s.catch_all);
+                    match catch_all {
+                        Some(niri_config::CatchAllMode::Ignore) => {
+                            this.niri.suppressed_keys.insert(key_code);
+                            return FilterResult::Intercept(None);
+                        }
+                        Some(niri_config::CatchAllMode::Reset) => {
+                            this.niri.suppressed_keys.insert(key_code);
+                            this.niri.exit_submap();
+                            return FilterResult::Intercept(None);
+                        }
+                        Some(niri_config::CatchAllMode::Passthrough) | None => {}
+                    }
+                }
 
                 if matches!(res, FilterResult::Forward) {
                     // If we didn't find any bind, try other hardcoded keys.
@@ -672,6 +711,14 @@ impl State {
             for action in actions {
                 self.do_action(action, bind.allow_when_locked);
             }
+            if self
+                .niri
+                .active_submap
+                .as_ref()
+                .map_or(false, |s| s.auto_reset)
+            {
+                self.niri.exit_submap();
+            }
             return;
         };
 
@@ -704,6 +751,14 @@ impl State {
                 };
                 for action in actions {
                     self.do_action(action, bind.allow_when_locked);
+                }
+                if self
+                    .niri
+                    .active_submap
+                    .as_ref()
+                    .map_or(false, |s| s.auto_reset)
+                {
+                    self.niri.exit_submap();
                 }
             }
         }
@@ -2444,14 +2499,18 @@ impl State {
                     self.niri.queue_redraw_mru_output();
                 }
             }
-            Action::SwitchSubmap(_name) => {
-                // Will be implemented in Phase 3
+            Action::SwitchSubmap(name) => {
+                self.niri.enter_submap(&name);
             }
             Action::ResetSubmap => {
-                // Will be implemented in Phase 3
+                self.niri.exit_submap();
             }
-            Action::ToggleSubmap(_name) => {
-                // Will be implemented in Phase 3
+            Action::ToggleSubmap(name) => {
+                if self.niri.active_submap.as_ref().map_or(false, |s| s.name == name) {
+                    self.niri.exit_submap();
+                } else {
+                    self.niri.enter_submap(&name);
+                }
             }
         }
     }
