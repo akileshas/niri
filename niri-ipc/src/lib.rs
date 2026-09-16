@@ -943,6 +943,21 @@ pub enum Action {
         #[cfg_attr(feature = "clap", arg(long))]
         path: Option<String>,
     },
+
+    /// Switch to a named submap.
+    SwitchSubmap {
+        /// Name of the submap to activate.
+        #[cfg_attr(feature = "clap", arg())]
+        name: String,
+    },
+    /// Reset (exit) the current submap, returning to root bindings.
+    ResetSubmap {},
+    /// Toggle a named submap: if already active, exit it; otherwise, enter it.
+    ToggleSubmap {
+        /// Name of the submap to toggle.
+        #[cfg_attr(feature = "clap", arg())]
+        name: String,
+    },
 }
 
 /// Change in window or column size.

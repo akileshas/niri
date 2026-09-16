@@ -1991,6 +1991,7 @@ mod tests {
                             ),
                         },
                         action: ToggleKeyboardShortcutsInhibit,
+                        sequence: [],
                         repeat: true,
                         cooldown: None,
                         allow_when_locked: false,
@@ -2000,6 +2001,7 @@ mod tests {
                                 "Inhibit",
                             ),
                         ),
+                        universal: false,
                     },
                     Bind {
                         key: Key {
@@ -2011,11 +2013,13 @@ mod tests {
                             ),
                         },
                         action: ToggleKeyboardShortcutsInhibit,
+                        sequence: [],
                         repeat: true,
                         cooldown: None,
                         allow_when_locked: false,
                         allow_inhibiting: false,
                         hotkey_overlay_title: None,
+                        universal: false,
                     },
                     Bind {
                         key: Key {
@@ -2031,11 +2035,13 @@ mod tests {
                                 "alacritty",
                             ],
                         ),
+                        sequence: [],
                         repeat: true,
                         cooldown: None,
                         allow_when_locked: true,
                         allow_inhibiting: true,
                         hotkey_overlay_title: None,
+                        universal: false,
                     },
                     Bind {
                         key: Key {
@@ -2047,6 +2053,7 @@ mod tests {
                             ),
                         },
                         action: CloseWindow,
+                        sequence: [],
                         repeat: true,
                         cooldown: None,
                         allow_when_locked: false,
@@ -2054,6 +2061,7 @@ mod tests {
                         hotkey_overlay_title: Some(
                             None,
                         ),
+                        universal: false,
                     },
                     Bind {
                         key: Key {
@@ -2065,11 +2073,13 @@ mod tests {
                             ),
                         },
                         action: FocusMonitorLeft,
+                        sequence: [],
                         repeat: true,
                         cooldown: None,
                         allow_when_locked: false,
                         allow_inhibiting: true,
                         hotkey_overlay_title: None,
+                        universal: false,
                     },
                     Bind {
                         key: Key {
@@ -2083,11 +2093,13 @@ mod tests {
                         action: FocusMonitor(
                             "eDP-1",
                         ),
+                        sequence: [],
                         repeat: true,
                         cooldown: None,
                         allow_when_locked: false,
                         allow_inhibiting: true,
                         hotkey_overlay_title: None,
+                        universal: false,
                     },
                     Bind {
                         key: Key {
@@ -2099,11 +2111,13 @@ mod tests {
                             ),
                         },
                         action: MoveWindowToMonitorRight,
+                        sequence: [],
                         repeat: true,
                         cooldown: None,
                         allow_when_locked: false,
                         allow_inhibiting: true,
                         hotkey_overlay_title: None,
+                        universal: false,
                     },
                     Bind {
                         key: Key {
@@ -2117,11 +2131,13 @@ mod tests {
                         action: MoveWindowToMonitor(
                             "eDP-1",
                         ),
+                        sequence: [],
                         repeat: true,
                         cooldown: None,
                         allow_when_locked: false,
                         allow_inhibiting: true,
                         hotkey_overlay_title: None,
+                        universal: false,
                     },
                     Bind {
                         key: Key {
@@ -2135,11 +2151,13 @@ mod tests {
                         action: MoveColumnToMonitor(
                             "DP-1",
                         ),
+                        sequence: [],
                         repeat: true,
                         cooldown: None,
                         allow_when_locked: false,
                         allow_inhibiting: true,
                         hotkey_overlay_title: None,
+                        universal: false,
                     },
                     Bind {
                         key: Key {
@@ -2151,11 +2169,13 @@ mod tests {
                             ),
                         },
                         action: ConsumeWindowIntoColumn,
+                        sequence: [],
                         repeat: true,
                         cooldown: None,
                         allow_when_locked: false,
                         allow_inhibiting: true,
                         hotkey_overlay_title: None,
+                        universal: false,
                     },
                     Bind {
                         key: Key {
@@ -2171,11 +2191,13 @@ mod tests {
                                 1,
                             ),
                         ),
+                        sequence: [],
                         repeat: true,
                         cooldown: None,
                         allow_when_locked: false,
                         allow_inhibiting: true,
                         hotkey_overlay_title: None,
+                        universal: false,
                     },
                     Bind {
                         key: Key {
@@ -2191,11 +2213,13 @@ mod tests {
                                 "workspace-1",
                             ),
                         ),
+                        sequence: [],
                         repeat: true,
                         cooldown: None,
                         allow_when_locked: false,
                         allow_inhibiting: true,
                         hotkey_overlay_title: None,
+                        universal: false,
                     },
                     Bind {
                         key: Key {
@@ -2209,11 +2233,13 @@ mod tests {
                         action: Quit(
                             true,
                         ),
+                        sequence: [],
                         repeat: true,
                         cooldown: None,
                         allow_when_locked: false,
                         allow_inhibiting: false,
                         hotkey_overlay_title: None,
+                        universal: false,
                     },
                     Bind {
                         key: Key {
@@ -2223,6 +2249,7 @@ mod tests {
                             ),
                         },
                         action: FocusWorkspaceDown,
+                        sequence: [],
                         repeat: true,
                         cooldown: Some(
                             150ms,
@@ -2230,6 +2257,7 @@ mod tests {
                         allow_when_locked: false,
                         allow_inhibiting: true,
                         hotkey_overlay_title: None,
+                        universal: false,
                     },
                     Bind {
                         key: Key {
@@ -2243,11 +2271,13 @@ mod tests {
                         action: SpawnSh(
                             "pkill orca || exec orca",
                         ),
+                        sequence: [],
                         repeat: true,
                         cooldown: None,
                         allow_when_locked: true,
                         allow_inhibiting: true,
                         hotkey_overlay_title: None,
+                        universal: false,
                     },
                 ],
             ),
@@ -2368,11 +2398,13 @@ mod tests {
                                 All,
                             ),
                         },
+                        sequence: [],
                         repeat: true,
                         cooldown: None,
                         allow_when_locked: false,
                         allow_inhibiting: true,
                         hotkey_overlay_title: None,
+                        universal: false,
                     },
                     Bind {
                         key: Key {
@@ -2390,11 +2422,13 @@ mod tests {
                                 AppId,
                             ),
                         },
+                        sequence: [],
                         repeat: true,
                         cooldown: None,
                         allow_when_locked: false,
                         allow_inhibiting: true,
                         hotkey_overlay_title: None,
+                        universal: false,
                     },
                     Bind {
                         key: Key {
@@ -2414,11 +2448,13 @@ mod tests {
                                 All,
                             ),
                         },
+                        sequence: [],
                         repeat: true,
                         cooldown: None,
                         allow_when_locked: false,
                         allow_inhibiting: true,
                         hotkey_overlay_title: None,
+                        universal: false,
                     },
                 ],
             },

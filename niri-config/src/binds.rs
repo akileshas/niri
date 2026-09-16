@@ -23,11 +23,13 @@ pub struct Binds(pub Vec<Bind>);
 pub struct Bind {
     pub key: Key,
     pub action: Action,
+    pub sequence: Vec<Action>,
     pub repeat: bool,
     pub cooldown: Option<Duration>,
     pub allow_when_locked: bool,
     pub allow_inhibiting: bool,
     pub hotkey_overlay_title: Option<Option<String>>,
+    pub universal: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -393,6 +395,10 @@ pub enum Action {
     MruSetScope(MruScope),
     #[knuffel(skip)]
     MruCycleScope,
+
+    SwitchSubmap(#[knuffel(argument)] String),
+    ResetSubmap,
+    ToggleSubmap(#[knuffel(argument)] String),
 }
 
 impl From<niri_ipc::Action> for Action {
@@ -704,6 +710,9 @@ impl From<niri_ipc::Action> for Action {
             niri_ipc::Action::SetWindowUrgent { id } => Self::SetWindowUrgent(id),
             niri_ipc::Action::UnsetWindowUrgent { id } => Self::UnsetWindowUrgent(id),
             niri_ipc::Action::LoadConfigFile { path } => Self::LoadConfigFile(path),
+            niri_ipc::Action::SwitchSubmap { name } => Self::SwitchSubmap(name),
+            niri_ipc::Action::ResetSubmap {} => Self::ResetSubmap,
+            niri_ipc::Action::ToggleSubmap { name } => Self::ToggleSubmap(name),
         }
     }
 }
@@ -847,6 +856,7 @@ where
         let mut allow_when_locked_node = None;
         let mut allow_inhibiting = true;
         let mut hotkey_overlay_title = None;
+        let mut universal = false;
         for (name, val) in &node.properties {
             match &***name {
                 "repeat" => {
@@ -867,6 +877,9 @@ where
                 "hotkey-overlay-title" => {
                     hotkey_overlay_title = Some(knuffel::traits::DecodeScalar::decode(val, ctx)?);
                 }
+                "universal" => {
+                    universal = knuffel::traits::DecodeScalar::decode(val, ctx)?;
+                }
                 name_str => {
                     ctx.emit_error(DecodeError::unexpected(
                         name,
@@ -877,29 +890,30 @@ where
             }
         }
 
-        let mut children = node.children();
-
-        // If the action is invalid but the key is fine, we still want to return something.
-        // That way, the parent can handle the existence of duplicate keybinds,
-        // even if their contents are not valid.
         let dummy = Self {
             key,
             action: Action::Spawn(vec![]),
+            sequence: vec![],
             repeat: true,
             cooldown: None,
             allow_when_locked: false,
             allow_inhibiting: true,
             hotkey_overlay_title: None,
+            universal: false,
         };
 
-        if let Some(child) = children.next() {
-            for unwanted_child in children {
-                ctx.emit_error(DecodeError::unexpected(
-                    unwanted_child,
-                    "node",
-                    "only one action is allowed per keybind",
-                ));
-            }
+        let mut children: Vec<_> = node.children().collect();
+
+        if children.is_empty() {
+            ctx.emit_error(DecodeError::missing(
+                node,
+                "expected an action for this keybind",
+            ));
+            return Ok(dummy);
+        }
+
+        if children.len() == 1 {
+            let child = children.remove(0);
             match Action::decode_node(child, ctx) {
                 Ok(action) => {
                     if !matches!(action, Action::Spawn(_) | Action::SpawnSh(_)) {
@@ -912,8 +926,6 @@ where
                         }
                     }
 
-                    // The toggle-inhibit action must always be uninhibitable.
-                    // Otherwise, it would be impossible to trigger it.
                     if matches!(action, Action::ToggleKeyboardShortcutsInhibit) {
                         allow_inhibiting = false;
                     }
@@ -921,11 +933,13 @@ where
                     Ok(Self {
                         key,
                         action,
+                        sequence: vec![],
                         repeat,
                         cooldown,
                         allow_when_locked,
                         allow_inhibiting,
                         hotkey_overlay_title,
+                        universal,
                     })
                 }
                 Err(e) => {
@@ -934,11 +948,33 @@ where
                 }
             }
         } else {
-            ctx.emit_error(DecodeError::missing(
-                node,
-                "expected an action for this keybind",
-            ));
-            Ok(dummy)
+            let mut sequence = Vec::new();
+            for child in &children {
+                match Action::decode_node(child, ctx) {
+                    Ok(action) => sequence.push(action),
+                    Err(e) => {
+                        ctx.emit_error(e);
+                    }
+                }
+            }
+
+            if sequence.is_empty() {
+                return Ok(dummy);
+            }
+
+            let action = sequence.remove(0);
+
+            Ok(Self {
+                key,
+                action,
+                sequence,
+                repeat,
+                cooldown,
+                allow_when_locked,
+                allow_inhibiting,
+                hotkey_overlay_title,
+                universal,
+            })
         }
     }
 }
