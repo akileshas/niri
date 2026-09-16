@@ -14,7 +14,7 @@
 extern crate tracing;
 
 use std::cell::{Cell, RefCell};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::fs::{self, File};
 use std::io::Write as _;
@@ -92,6 +92,7 @@ pub struct Config {
     pub debug: Debug,
     pub workspaces: Vec<Workspace>,
     pub recent_windows: RecentWindows,
+    pub submaps: HashMap<String, Submap>,
 }
 
 #[derive(Debug, Clone)]
@@ -214,6 +215,11 @@ where
                 "window-rule" => m_push!(window_rules),
                 "layer-rule" => m_push!(layer_rules),
                 "workspace" => m_push!(workspaces),
+
+                "submap" => {
+                    let submap = Submap::decode_node(node, ctx)?;
+                    config.borrow_mut().submaps.insert(submap.name.clone(), submap);
+                }
 
                 // Single-part sections.
                 "binds" => {
@@ -2458,6 +2464,7 @@ mod tests {
                     },
                 ],
             },
+            submaps: {},
         }
         "#);
     }
