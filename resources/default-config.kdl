@@ -351,7 +351,7 @@ window-rule {
 //     overlay-title "Resize Mode"
 //     clear-global-binds true
 //     catch-all "reset"
-//     timeout 5000
+//     timeout-ms 5000
 //     reset-target "default"
 //     input-policy { allow-mouse true; allow-touchpad false; }
 //     on-enter { show-hotkey-overlay; }

@@ -1174,58 +1174,6 @@ where
         let mut on_exit = Vec::new();
         let mut binds = Vec::new();
 
-        for (prop_name, val) in &node.properties {
-            match &***prop_name {
-                "auto-reset" => auto_reset = DecodeScalar::decode(val, ctx)?,
-                "clear-global-binds" => clear_global_binds = DecodeScalar::decode(val, ctx)?,
-                "catch-all" => {
-                    let s: String = DecodeScalar::decode(val, ctx)?;
-                    catch_all = match s.as_str() {
-                        "ignore" => CatchAllMode::Ignore,
-                        "reset" => CatchAllMode::Reset,
-                        "passthrough" => CatchAllMode::Passthrough,
-                        other => {
-                            ctx.emit_error(DecodeError::unexpected(
-                                prop_name,
-                                "property",
-                                format!(
-                                    "catch-all value must be one of: ignore, reset, passthrough; got \"{other}\""
-                                ),
-                            ));
-                            CatchAllMode::Ignore
-                        }
-                    };
-                }
-                "allow-mouse" => input_policy.mouse = DecodeScalar::decode(val, ctx)?,
-                "allow-touchpad" => input_policy.touchpad = DecodeScalar::decode(val, ctx)?,
-                "allow-trackpoint" => input_policy.trackpoint = DecodeScalar::decode(val, ctx)?,
-                "allow-trackball" => input_policy.trackball = DecodeScalar::decode(val, ctx)?,
-                "allow-tablet" => input_policy.tablet = DecodeScalar::decode(val, ctx)?,
-                "allow-touch" => input_policy.touch = DecodeScalar::decode(val, ctx)?,
-                "timeout-ms" => {
-                    let ms: u64 = DecodeScalar::decode(val, ctx)?;
-                    if ms == 0 {
-                        ctx.emit_error(DecodeError::unexpected(
-                            prop_name,
-                            "property",
-                            "timeout-ms must be > 0",
-                        ));
-                    } else {
-                        timeout_ms = Some(ms);
-                    }
-                }
-                "reset-target" => reset_target = DecodeScalar::decode(val, ctx)?,
-                "overlay-title" => overlay_title = Some(DecodeScalar::decode(val, ctx)?),
-                other => {
-                    ctx.emit_error(DecodeError::unexpected(
-                        prop_name,
-                        "property",
-                        format!("unexpected property `{}`", other.escape_default()),
-                    ));
-                }
-            }
-        }
-
         for child in node.children() {
             match child.node_name.as_ref() {
                 "on-enter" => {
@@ -1241,6 +1189,106 @@ where
                         match Action::decode_node(action_node, ctx) {
                             Ok(action) => on_exit.push(action),
                             Err(e) => ctx.emit_error(e),
+                        }
+                    }
+                }
+                "overlay-title" => {
+                    let val = child.arguments.first().ok_or_else(|| {
+                        DecodeError::missing(child, "overlay-title requires a value")
+                    })?;
+                    overlay_title = Some(DecodeScalar::decode(val, ctx)?);
+                }
+                "clear-global-binds" => {
+                    let val = child.arguments.first().ok_or_else(|| {
+                        DecodeError::missing(child, "clear-global-binds requires a value")
+                    })?;
+                    clear_global_binds = DecodeScalar::decode(val, ctx)?;
+                }
+                "catch-all" => {
+                    let val = child.arguments.first().ok_or_else(|| {
+                        DecodeError::missing(child, "catch-all requires a value")
+                    })?;
+                    let s: String = DecodeScalar::decode(val, ctx)?;
+                    catch_all = match s.as_str() {
+                        "ignore" => CatchAllMode::Ignore,
+                        "reset" => CatchAllMode::Reset,
+                        "passthrough" => CatchAllMode::Passthrough,
+                        other => {
+                            ctx.emit_error(DecodeError::unexpected(
+                                &child.node_name,
+                                "node",
+                                format!(
+                                    "catch-all value must be one of: ignore, reset, passthrough; got \"{other}\""
+                                ),
+                            ));
+                            CatchAllMode::Ignore
+                        }
+                    };
+                }
+                "timeout-ms" => {
+                    let val = child.arguments.first().ok_or_else(|| {
+                        DecodeError::missing(child, "timeout-ms requires a value")
+                    })?;
+                    let ms: u64 = DecodeScalar::decode(val, ctx)?;
+                    if ms == 0 {
+                        ctx.emit_error(DecodeError::unexpected(
+                            &child.node_name,
+                            "node",
+                            "timeout-ms must be > 0",
+                        ));
+                    } else {
+                        timeout_ms = Some(ms);
+                    }
+                }
+                "reset-target" => {
+                    let val = child.arguments.first().ok_or_else(|| {
+                        DecodeError::missing(child, "reset-target requires a value")
+                    })?;
+                    reset_target = DecodeScalar::decode(val, ctx)?;
+                }
+                "auto-reset" => {
+                    let val = child.arguments.first().ok_or_else(|| {
+                        DecodeError::missing(child, "auto-reset requires a value")
+                    })?;
+                    auto_reset = DecodeScalar::decode(val, ctx)?;
+                }
+                "input-policy" => {
+                    for prop_child in child.children() {
+                        let val = match prop_child.arguments.first() {
+                            Some(v) => v,
+                            None => {
+                                ctx.emit_error(DecodeError::missing(
+                                    prop_child,
+                                    "input policy flag requires a value",
+                                ));
+                                continue;
+                            }
+                        };
+                        match prop_child.node_name.as_ref() {
+                            "allow-mouse" => input_policy.mouse = DecodeScalar::decode(val, ctx)?,
+                            "allow-touchpad" => {
+                                input_policy.touchpad = DecodeScalar::decode(val, ctx)?
+                            }
+                            "allow-trackpoint" => {
+                                input_policy.trackpoint = DecodeScalar::decode(val, ctx)?
+                            }
+                            "allow-trackball" => {
+                                input_policy.trackball = DecodeScalar::decode(val, ctx)?
+                            }
+                            "allow-tablet" => {
+                                input_policy.tablet = DecodeScalar::decode(val, ctx)?
+                            }
+                            "allow-touch" => input_policy.touch = DecodeScalar::decode(val, ctx)?,
+                            other => {
+                                ctx.emit_error(DecodeError::unexpected(
+                                    &prop_child.node_name,
+                                    "node",
+                                    format!(
+                                        "unexpected input-policy flag `{}`",
+                                        other.escape_default()
+                                    ),
+                                ));
+                            }
                         }
                     }
                 }

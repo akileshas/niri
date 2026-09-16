@@ -12,7 +12,7 @@ submap "resize" {
     overlay-title "Resize Mode"
     clear-global-binds true
     catch-all "reset"
-    timeout 5000
+    timeout-ms 5000
     reset-target "default"
     input-policy {
         allow-mouse true
@@ -68,7 +68,7 @@ submap "resize" {
 
 #### `clear-global-binds`
 
-Can be `true` or `false`. Default: `false`.
+Can be `true` or `false`. Default: `true`.
 
 When `true`, only binds marked with the `universal` attribute in the root `binds {}` section will be active inside this submap. All other root binds are ignored.
 
@@ -96,7 +96,7 @@ submap "resize" {
 }
 ```
 
-#### `timeout`
+#### `timeout-ms`
 
 Set an auto-exit timeout in milliseconds. After this many milliseconds, the submap will automatically exit.
 
@@ -104,7 +104,7 @@ If not set, the submap stays active until explicitly exited.
 
 ```kdl
 submap "resize" {
-    timeout 5000
+    timeout-ms 5000
 }
 ```
 
@@ -175,7 +175,7 @@ Submap binds support multiple actions per key using braces:
 
 ```kdl
 submap "resize" {
-    Mod+Right { focus-column-right; resize-column-width-right 100; }
+    Mod+Right { focus-column-right; set-column-width "+100"; }
 }
 ```
 
@@ -185,7 +185,7 @@ The `universal` attribute on root binds makes them available in all submaps, eve
 
 ```kdl
 binds {
-    Mod+Shift+Slash { show-hotkey-overlay; universal; }
+    Mod+Shift+Slash universal=true { show-hotkey-overlay; }
 }
 ```
 
@@ -199,7 +199,9 @@ With `reset-target "previous"`, exiting the nested submap returns to the parent 
 submap "parent" {
     Mod+P { switch-submap "child"; }
 }
+```
 
+```kdl
 submap "child" {
     reset-target "previous"
     Mod+Escape { reset-submap; }
