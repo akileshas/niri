@@ -3939,8 +3939,6 @@ impl Niri {
 
         debug!("exited submap \"{}\"", active_name);
 
-        self.submap_overlay.hide();
-
         self.cancel_submap_timeout();
 
         let on_exit = {
@@ -3951,6 +3949,8 @@ impl Niri {
                 .map(|s| s.on_exit.clone())
                 .unwrap_or_default()
         };
+
+        let mut new_submap_name: Option<String> = None;
 
         match active.reset_target.as_str() {
             "default" => {}
@@ -3965,13 +3965,14 @@ impl Niri {
                                 prev.catch_all,
                                 prev.input_policy.clone(),
                                 prev.reset_target.clone(),
+                                prev.timeout_ms,
                             )
                         })
                     };
-                    if let Some((auto_reset, clear_global_binds, catch_all, input_policy, reset_target)) = submap_data {
+                    if let Some((auto_reset, clear_global_binds, catch_all, input_policy, reset_target, timeout_ms)) = submap_data {
                         debug!("restoring previous submap \"{}\"", prev_name);
                         self.active_submap = Some(ActiveSubmap {
-                            name: prev_name,
+                            name: prev_name.clone(),
                             auto_reset,
                             clear_global_binds,
                             catch_all,
@@ -3979,6 +3980,10 @@ impl Niri {
                             reset_target,
                             previous_submap: None,
                         });
+                        new_submap_name = Some(prev_name);
+                        if let Some(timeout) = timeout_ms {
+                            self.start_submap_timeout(timeout);
+                        }
                     }
                 }
             }
@@ -3992,10 +3997,11 @@ impl Niri {
                             sub.catch_all,
                             sub.input_policy.clone(),
                             sub.reset_target.clone(),
+                            sub.timeout_ms,
                         )
                     })
                 };
-                if let Some((auto_reset, clear_global_binds, catch_all, input_policy, reset_target)) = submap_data {
+                if let Some((auto_reset, clear_global_binds, catch_all, input_policy, reset_target, timeout_ms)) = submap_data {
                     self.active_submap = Some(ActiveSubmap {
                         name: target.to_string(),
                         auto_reset,
@@ -4005,10 +4011,20 @@ impl Niri {
                         reset_target,
                         previous_submap: Some(active_name.clone()),
                     });
+                    new_submap_name = Some(target.to_string());
+                    if let Some(timeout) = timeout_ms {
+                        self.start_submap_timeout(timeout);
+                    }
                 } else {
                     warn!("reset-target \"{target}\" not found, falling back to root");
                 }
             }
+        }
+
+        if let Some(ref name) = new_submap_name {
+            self.submap_overlay.show(name);
+        } else {
+            self.submap_overlay.hide();
         }
 
         if !on_exit.is_empty() {
@@ -4034,6 +4050,9 @@ impl Niri {
 
         if let Some(server) = &self.ipc_server {
             server.send_event(Event::SubmapDeactivated);
+            if let Some(name) = new_submap_name {
+                server.send_event(Event::SubmapActivated { name });
+            }
         }
     }
 

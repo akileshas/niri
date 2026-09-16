@@ -556,7 +556,6 @@ impl State {
 
                 let res = {
                     let config = this.niri.config.borrow();
-                    let _submap_active = this.niri.active_submap.is_some();
 
                     let bindings: Vec<&Bind> = if let Some(ref submap) = this.niri.active_submap {
                         let mut binds: Vec<&Bind> = config

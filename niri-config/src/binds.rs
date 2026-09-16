@@ -965,6 +965,20 @@ where
 
             let action = sequence.remove(0);
 
+            if !matches!(action, Action::Spawn(_) | Action::SpawnSh(_)) {
+                if let Some(node) = allow_when_locked_node {
+                    ctx.emit_error(DecodeError::unexpected(
+                        node,
+                        "property",
+                        "allow-when-locked can only be set on spawn binds",
+                    ));
+                }
+            }
+
+            if matches!(action, Action::ToggleKeyboardShortcutsInhibit) {
+                allow_inhibiting = false;
+            }
+
             Ok(Self {
                 key,
                 action,

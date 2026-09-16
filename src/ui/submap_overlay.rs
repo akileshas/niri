@@ -37,7 +37,7 @@ enum State {
     Hidden,
     Showing(String, Animation),
     Shown(String, Duration),
-    Hiding(Animation),
+    Hiding(String, Animation),
 }
 
 impl SubmapOverlay {
@@ -57,11 +57,13 @@ impl SubmapOverlay {
     }
 
     pub fn hide(&mut self) {
-        if matches!(self.state, State::Hidden) {
-            return;
+        if let State::Shown(name, _) | State::Showing(name, _) = &self.state {
+            let name = name.clone();
+            self.state = State::Hiding(
+                name,
+                Animation::new(self.clock.clone(), 1., 0., 0., ANIM_DURATION),
+            );
         }
-
-        self.state = State::Hiding(Animation::new(self.clock.clone(), 1., 0., 0., ANIM_DURATION));
     }
 
     pub fn advance_animations(&mut self) {
@@ -78,7 +80,7 @@ impl SubmapOverlay {
                     self.hide();
                 }
             }
-            State::Hiding(anim) => {
+            State::Hiding(_, anim) => {
                 if anim.is_clamped_done() {
                     self.state = State::Hidden;
                 }
@@ -95,10 +97,11 @@ impl SubmapOverlay {
         renderer: &mut R,
         output: &Output,
     ) -> Option<PrimaryGpuTextureRenderElement> {
-        let name = match &self.state {
+        let (name, _alpha) = match &self.state {
             State::Hidden => return None,
-            State::Showing(name, _) | State::Shown(name, _) => name.clone(),
-            State::Hiding(_) => return None,
+            State::Showing(name, anim) => (name.clone(), anim.value() as f32),
+            State::Shown(name, _) => (name.clone(), 1.0),
+            State::Hiding(name, anim) => (name.clone(), anim.value() as f32),
         };
 
         let scale = output.current_scale().fractional_scale();
@@ -115,10 +118,11 @@ impl SubmapOverlay {
         let y_range = size.h + f64::from(PADDING) * 2.;
 
         let x = (output_size.w - size.w).max(0.) / 2.;
-        let y = match &self.state {
+        let (y, alpha_f64) = match &self.state {
             State::Hidden => unreachable!(),
-            State::Showing(_, anim) | State::Hiding(anim) => -size.h + anim.value() * y_range,
-            State::Shown(_, _) => f64::from(PADDING) * 2.,
+            State::Showing(_, anim) => (-size.h + anim.value() * y_range, anim.value()),
+            State::Shown(_, _) => (f64::from(PADDING) * 2., 1.0),
+            State::Hiding(_, anim) => (-size.h + anim.value() * y_range, anim.value()),
         };
 
         let location = Point::from((x, y));
@@ -127,7 +131,7 @@ impl SubmapOverlay {
         let elem = TextureRenderElement::from_texture_buffer(
             buffer,
             location,
-            1.,
+            alpha_f64 as f32,
             None,
             None,
             Kind::Unspecified,
